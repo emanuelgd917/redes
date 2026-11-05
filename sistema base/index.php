@@ -10,8 +10,6 @@
     <div class="card shadow p-4 mb-4">
         <h3 class="mb-3">Novo Cadastro</h3>
         
-        <a href="login.php" style="font-weight: bold; font-size: 1.1em; color: blue;">👉 Já tem uma conta? Clique aqui para entrar!</a>
-
         <form action="salvar.php" method="POST">
             <div class="mb-3">
                 <label class="form-label">Nome Completo</label>
@@ -34,9 +32,6 @@
             </div>
             <button type="submit" class="btn btn-success">Salvar</button>
         </form>
-    </div>
-    <a href="listar.php" class="btn btn-warning">Dados Cadastrados</a>
-</div>
-
+    
 </body>
 </html>

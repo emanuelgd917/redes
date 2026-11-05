@@ -2,7 +2,6 @@
 session_start();
 include("conexao.php");
 
-// Proteção: Se o usuário tentar acessar direto sem logar, joga ele para o login
 if (!isset($_SESSION['usuario_id'])) {
     header("Location: login.php");
     exit();
@@ -10,11 +9,7 @@ if (!isset($_SESSION['usuario_id'])) {
 
 $usuario_id = $_SESSION['usuario_id'];
 
-// ==========================================
-// PROCESSAMENTO: SALVAR METAS E LIVROS (NA PRÓPRIA PÁGINA)
-// ==========================================
 
-// 1. Se a ação for Salvar Meta
 if (isset($_POST['acao']) && $_POST['acao'] == 'salvar_meta') {
     $meta_livros = intval($_POST['meta_livros']);
 
@@ -22,12 +17,19 @@ if (isset($_POST['acao']) && $_POST['acao'] == 'salvar_meta') {
     $stmt->bind_param("iii", $usuario_id, $meta_livros, $meta_livros);
     $stmt->execute();
     
-    // Recarrega a página para atualizar os dados na tela
     header("Location: painel.php");
     exit();
 }
 
-// 2. Se a ação for Adicionar Livro
+if (isset($_POST['acao']) && $_POST['acao'] == 'remover_meta') {
+    $stmt = $conn->prepare("DELETE FROM metas WHERE usuario_id = ?");
+    $stmt->bind_param("i", $usuario_id);
+    $stmt->execute();
+    
+    header("Location: painel.php");
+    exit();
+}
+
 if (isset($_POST['acao']) && $_POST['acao'] == 'adicionar_livro') {
     $titulo = $_POST['titulo'];
     $autor = $_POST['autor'];
@@ -37,27 +39,40 @@ if (isset($_POST['acao']) && $_POST['acao'] == 'adicionar_livro') {
     $stmt->bind_param("isss", $usuario_id, $titulo, $autor, $status);
     $stmt->execute();
     
-    // Recarrega a página para atualizar os dados na tela
     header("Location: painel.php");
     exit();
 }
 
-// ==========================================
-// BUSCA DE DADOS PARA EXIBIR NA TELA
-// ==========================================
+if (isset($_POST['acao']) && $_POST['acao'] == 'marcar_lido') {
+    $id_livro = intval($_POST['id_livro']);
 
-// 1. Busca os livros "Quero Ler" do usuário logado
+    $stmt = $conn->prepare("UPDATE livros SET status = 'lido' WHERE id = ? AND usuario_id = ?");
+    $stmt->bind_param("ii", $id_livro, $usuario_id);
+    $stmt->execute();
+    
+    header("Location: painel.php");
+    exit();
+}
+
+if (isset($_POST['acao']) && $_POST['acao'] == 'remover_livro') {
+    $id_livro = intval($_POST['id_livro']);
+
+    $stmt = $conn->prepare("DELETE FROM livros WHERE id = ? AND usuario_id = ?");
+    $stmt->bind_param("ii", $id_livro, $usuario_id);
+    $stmt->execute();
+    
+    header("Location: painel.php");
+    exit();
+}
+
+
 $lista_quero = $conn->query("SELECT * FROM livros WHERE usuario_id = $usuario_id AND status = 'quero_ler'");
-
-// 2. Busca os livros "Já Li" do usuário logado
 $lista_lidos = $conn->query("SELECT * FROM livros WHERE usuario_id = $usuario_id AND status = 'lido'");
 
-// 3. Busca a Meta de leitura do usuário
 $meta_query = $conn->query("SELECT meta_livros FROM metas WHERE usuario_id = $usuario_id");
 $meta_dados = $meta_query->fetch_assoc();
 $meta_definida = $meta_dados ? $meta_dados['meta_livros'] : 0;
 
-// Conta quantos livros já foram lidos para calcular a barra de progresso
 $total_lidos = $lista_lidos->num_rows;
 ?>
 
@@ -70,6 +85,8 @@ $total_lidos = $lista_lidos->num_rows;
         .listas-container { display: flex; gap: 40px; margin-top: 20px; }
         .coluna { flex: 1; border: 1px solid #ccc; padding: 15px; border-radius: 5px; }
         .meta-box { background: #f4f4f4; padding: 15px; margin-bottom: 25px; border-radius: 5px; }
+        .meta-acoes { display: flex; align-items: center; gap: 10px; margin-bottom: 15px; }
+        .botoes-acoes { display: flex; align-items: center; gap: 10px; }
     </style>
 </head>
 <body>
@@ -77,26 +94,34 @@ $total_lidos = $lista_lidos->num_rows;
     <a href="logout.php">Sair da Conta</a>
     <hr>
 
-    <!-- SEÇÃO DA META -->
     <div class="meta-box">
-        <h3>🎯 Minha Meta de Leitura</h3>
-        <form method="POST" action="painel.php">
-            <input type="hidden" name="acao" value="salvar_meta">
-            Definir meta: <input type="number" name="meta_livros" value="<?php echo $meta_definida; ?>" min="1" required> livros.
-            <button type="submit">Salvar Meta</button>
-        </form>
+        <h3>🏆 Minha Meta de Leitura</h3>
+        
+        <div class="meta-acoes">
+            <form method="POST" action="painel.php" style="display: inline;">
+                <input type="hidden" name="acao" value="salvar_meta">
+                Definir meta: <input type="number" name="meta_livros" value="<?php echo $meta_definida; ?>" min="1" required> livros.
+                <button type="submit">Salvar Meta</button>
+            </form>
+
+            <?php if ($meta_definida > 0): ?>
+                <form method="POST" action="painel.php" style="display: inline;">
+                    <input type="hidden" name="acao" value="remover_meta">
+                    <button type="submit" style="background-color: #ff4d4d; color: white; border: none; padding: 4px 10px; border-radius: 3px; cursor: pointer;" onclick="return confirm('Tem certeza que deseja apagar sua meta de leitura?')">Excluir Meta</button>
+                </form>
+            <?php endif; ?>
+        </div>
 
         <?php if ($meta_definida > 0): ?>
             <p>Progresso: Você leu <strong><?php echo $total_lidos; ?></strong> de <strong><?php echo $meta_definida; ?></strong> livros!</p>
             <progress value="<?php echo $total_lidos; ?>" max="<?php echo $meta_definida; ?>"></progress>
         <?php else: ?>
-            <p>Você ainda não definiu uma meta de leitura.</p>
+            <p style="color: #666; font-style: italic;">Você ainda não definiu uma meta de leitura.</p>
         <?php endif; ?>
     </div>
 
-    <!-- SEÇÃO DE ADICIONAR LIVRO -->
     <div>
-        <h3>➕ Adicionar Livro</h3>
+        <h3>🔍 Adicionar Livro</h3>
         <form method="POST" action="painel.php">
             <input type="hidden" name="acao" value="adicionar_livro">
             <input type="text" name="titulo" placeholder="Título do Livro" required>
@@ -109,22 +134,48 @@ $total_lidos = $lista_lidos->num_rows;
         </form>
     </div>
 
-    <!-- SEÇÃO DAS LISTAS -->
     <div class="listas-container">
         <div class="coluna">
-            <h3>📚 Quero Ler (<?php echo $lista_quero->num_rows; ?>)</h3>
+            <h3>❤️ Quero Ler (<?php echo $lista_quero->num_rows; ?>)</h3>
             <ul>
                 <?php while($livro = $lista_quero->fetch_assoc()): ?>
-                    <li><strong><?php echo $livro['titulo']; ?></strong> - <?php echo $livro['autor']; ?></li>
+                    <li style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                        <span>
+                            <strong><?php echo $livro['titulo']; ?></strong> - <?php echo $livro['autor']; ?>
+                        </span>
+                        
+                        <div class="botoes-acoes">
+                            <form method="POST" action="painel.php" style="display:inline;">
+                                <input type="hidden" name="acao" value="marcar_lido">
+                                <input type="hidden" name="id_livro" value="<?php echo $livro['id']; ?>">
+                                <button type="submit" style="background: none; border: none; cursor: pointer; color: green; font-size: 1.1em;" title="Marcar como lido">✔</button>
+                            </form>
+
+                            <form method="POST" action="painel.php" style="display:inline;">
+                                <input type="hidden" name="acao" value="remover_livro">
+                                <input type="hidden" name="id_livro" value="<?php echo $livro['id']; ?>">
+                                <button type="submit" style="background: none; border: none; cursor: pointer; color: red;" onclick="return confirm('Deseja mesmo remover este livro da sua lista?')">❌</button>
+                            </form>
+                        </div>
+                    </li>
                 <?php endwhile; ?>
             </ul>
         </div>
 
         <div class="coluna">
-            <h3>✅ Já Lidos (<?php echo $total_lidos; ?>)</h3>
+            <h3>🏅 Já Lidos (<?php echo $total_lidos; ?>)</h3>
             <ul>
                 <?php while($livro = $lista_lidos->fetch_assoc()): ?>
-                    <li><strong><?php echo $livro['titulo']; ?></strong> - <?php echo $livro['autor']; ?></li>
+                    <li style="margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                        <span>
+                            <strong><?php echo $livro['titulo']; ?></strong> - <?php echo $livro['autor']; ?>
+                        </span>
+                        <form method="POST" action="painel.php" style="display:inline; margin-left: 10px;">
+                            <input type="hidden" name="acao" value="remover_livro">
+                            <input type="hidden" name="id_livro" value="<?php echo $livro['id']; ?>">
+                            <button type="submit" style="background: none; border: none; cursor: pointer; color: red;" onclick="return confirm('Deseja mesmo remover este livro da sua lista?')">❌</button>
+                        </form>
+                    </li>
                 <?php endwhile; ?>
             </ul>
         </div>

@@ -1,12 +1,12 @@
 <?php
 session_start();
-include("conexao.php"); // Certifique-se de que seu arquivo de conexão usa a variável $conn
+include("conexao.php"); 
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $email = $_POST['email'];
-
-    // Busca o usuário na tabela 'clientes' pelo e-mail
-    $sql = "SELECT id, nome FROM clientes WHERE email = ?";
+    $senha = $_POST['senha']; 
+    
+    $sql = "SELECT id, nome, senha FROM clientes WHERE email = ?";
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("s", $email);
     $stmt->execute();
@@ -15,15 +15,17 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if ($result->num_rows > 0) {
         $usuario = $result->fetch_assoc();
         
-        // Guarda os dados na sessão para saber quem está logado
-        $_SESSION['usuario_id'] = $usuario['id'];
-        $_SESSION['usuario_nome'] = $usuario['nome'];
-        
-        // Redireciona para o painel de listas e metas
-        header("Location: painel.php"); 
-        exit();
+        if (password_verify($senha, $usuario['senha'])) {
+            $_SESSION['usuario_id'] = $usuario['id'];
+            $_SESSION['usuario_nome'] = $usuario['nome'];
+            
+            header("Location: painel.php"); 
+            exit();
+        } else {
+            $erro = "E-mail ou senha incorretos!";
+        }
     } else {
-        $erro = "E-mail não encontrado no sistema!";
+        $erro = "E-mail ou senha incorretos!";
     }
 }
 ?>
@@ -40,9 +42,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     
     <form method="POST" action="login.php">
         <input type="email" name="email" placeholder="Digite seu e-mail cadastrado" required><br><br>
+        
+        <input type="password" name="senha" placeholder="Digite sua senha" required><br><br>
+        
         <button type="submit">Entrar</button>
     </form>
     <br>
-    <a href="index.php">Não tem conta? Cadastre-se aqui</a>
+    <a href="index.php">Crie uma conta</a>
 </body>
 </html>
